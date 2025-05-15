@@ -29,18 +29,22 @@ An advanced image enhancement project for improving visibility in images, especi
 
 ## Setup
 
-1.  **Clone the repository (if applicable):**
+1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
+    git clone https://github.com/rizqishq/adaptive-image-enhancer
     cd adaptive-image-enhancer
     ```
 
 2.  **Create a virtual environment (recommended):**
     ```bash
     python -m venv venv
-    # On Windows
+    ```
+    On Windows
+    ```bash
     venv\Scripts\activate
-    # On macOS/Linux
+    ```
+    On macOS/Linux
+    ```bash
     source venv/bin/activate
     ```
 
@@ -86,10 +90,18 @@ This script enhances input images using various image processing techniques.
     ```bash
     python image_enhancement.py --input path/to/your/original_image.jpg --output path/to/your/enhanced_image.jpg
     ```
+    **Example:**
+    ```bash
+    python image_enhancement.py --input sample/sample.jpg --output result.jpg
+    ```
 
 *   **Enhance all images in a directory (batch processing):**
     ```bash
     python image_enhancement.py --input path/to/original_images_dir/ --output path/to/enhanced_images_dir/ --batch
+    ```
+    **Example:**
+    ```bash
+    python image_enhancement.py --input sample/ --output results/ --batch
     ```
     In batch mode, enhanced images will be saved as `enhanced_<original_filename>.jpg` in the output directory. A `processing_summary.json` file will also be created in the output directory, containing processing details and metrics for each image.
 
@@ -109,6 +121,10 @@ This script generates a detailed visual comparison plot for an original image an
     ```bash
     python comparison.py --original path/to/original.jpg --enhanced path/to/enhanced.jpg --output path/to/comparison_output_dir/
     ```
+    **Example:**
+    ```bash
+    python comparison.py --original sample/sample.jpg --enhanced result/enhanced_sample.jpg --output comparison_sample
+    ```
     This will save a `detailed_comparison_<original_filename_stem>.png` in the specified output directory.
 
 *   **Compare images from default directories (`sample/` and `results/`):**
@@ -125,6 +141,10 @@ This script generates a detailed visual comparison plot for an original image an
     ```bash
     python comparison.py --original path/to/originals/ --enhanced path/to/enhanced_versions/ --output path/to/comparison_output_dir/
     ```
+    **Example:**
+    ```bash
+    python comparison.py --original sample/ --enhanced results/ --output comparison_result/
+    ```
     The script will look for images in the original directory and try to find corresponding enhanced images (named `enhanced_<original_stem>.jpg`) in the enhanced directory.
 
 ## Output Files
@@ -140,6 +160,5 @@ This script generates a detailed visual comparison plot for an original image an
 *   The `opencv-contrib-python` package might be needed if `cv2.ximgproc.guidedFilter` is not available in the standard `opencv-python` package for your environment. The `requirements.txt` above includes it.
 *   Ensure the paths provided to the scripts are correct.
 *   For batch comparison, the enhanced images are expected to be named following the pattern `enhanced_<original_image_stem>.jpg` relative to the original image names.
-
 
 INI ADALAH PERUBAHAN YANG YAKOBUS APIN BUAT

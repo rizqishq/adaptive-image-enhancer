@@ -1,5 +1,5 @@
 {
-    "timestamp": "2025-05-15 19:30:02",
+    "timestamp": "2025-05-15 23:39:04",
     "total_images_found": 3,
     "successful_processing": 3,
     "failed_processing": 0,
@@ -24,7 +24,7 @@
                 "detail_strength": 0.3,
                 "denoise_strength": 5
             },
-            "output_path": "result/enhanced_sample.jpg",
+            "output_path": "results/enhanced_sample.jpg",
             "status": "success"
         },
         "sample3": {
@@ -47,7 +47,7 @@
                 "detail_strength": 0.3,
                 "denoise_strength": 5
             },
-            "output_path": "result/enhanced_sample3.jpg",
+            "output_path": "results/enhanced_sample3.jpg",
             "status": "success"
         },
         "sample2": {
@@ -70,7 +70,7 @@
                 "detail_strength": 0.3,
                 "denoise_strength": 5
             },
-            "output_path": "result/enhanced_sample2.jpg",
+            "output_path": "results/enhanced_sample2.jpg",
             "status": "success"
         }
     }

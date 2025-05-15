@@ -362,6 +362,35 @@ def main():
     
     cli_args = parser.parse_args()
 
+    original_output_arg = cli_args.output
+    
+    path_for_name_check_str = original_output_arg
+    had_trailing_slash = False
+    if original_output_arg.endswith('/') or original_output_arg.endswith('\\\\'):
+        had_trailing_slash = True
+        # rstrip can return empty string if original was just "/" or "\\"
+        temp_stripped = original_output_arg.rstrip('/\\\\')
+        # Ensure path_for_name_check_str is not empty if original was e.g. "/"
+        # If temp_stripped is empty, it means original_output_arg was a root or just slashes
+        path_for_name_check_str = temp_stripped if temp_stripped else original_output_arg
+
+    # p_check needs to be created from a non-empty string for .name to work as expected
+    # If path_for_name_check_str ended up empty (e.g. original was '/'), Path('').name is '', which is fine.
+    p_check = Path(path_for_name_check_str)
+
+    if p_check.name == "result":
+        # Construct new path by replacing 'result' with 'results'
+        new_p = p_check.with_name("results")
+        new_path_str = str(new_p) # Converts to OS-specific path string
+
+        if had_trailing_slash:
+            # If original had a trailing slash, ensure the new path also does for consistency.
+            if not new_path_str.endswith(os.sep):
+                 new_path_str += os.sep
+        
+        print(f"Info: Output path '{original_output_arg}' has been automatically changed to '{new_path_str}'.")
+        cli_args.output = new_path_str
+
     print_section_header("PROGRAM CONFIGURATION")
     print("Parameters:")
     print(f"  Input: {cli_args.input}")
