@@ -140,3 +140,6 @@ This script generates a detailed visual comparison plot for an original image an
 *   The `opencv-contrib-python` package might be needed if `cv2.ximgproc.guidedFilter` is not available in the standard `opencv-python` package for your environment. The `requirements.txt` above includes it.
 *   Ensure the paths provided to the scripts are correct.
 *   For batch comparison, the enhanced images are expected to be named following the pattern `enhanced_<original_image_stem>.jpg` relative to the original image names.
+
+
+INI ADALAH PERUBAHAN YANG YAKOBUS APIN BUAT
