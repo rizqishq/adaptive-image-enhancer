@@ -11,6 +11,7 @@ import glob
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import warnings
+import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')
 
 def calculate_metrics(original_image, enhanced_image):
@@ -92,8 +93,7 @@ def adaptive_gamma_correction(illumination_map_normalized, gamma_min=0.4, gamma_
     brightness_factor = 1.0 + (0.3 * (1.0 - mean_illumination))
     brightened_illumination = gamma_corrected_illumination * brightness_factor
     
-    final_corrected_illumination = np.clip(brightened_illumination, 0, 1)
-    return final_corrected_illumination, gamma_value
+    return np.clip(brightened_illumination, 0, 1)
 
 def multi_scale_fusion(luminance_normalized, corrected_illumination_map):
     global_enhanced_luminance = np.clip(luminance_normalized / (corrected_illumination_map + 1e-6), 0, 1)
@@ -182,6 +182,43 @@ def print_file_info(file_path_to_check, description_text):
     else:
         print("  Status: File not found!")
 
+def plot_histograms(original_image, enhanced_image, output_path):
+    if len(original_image.shape) == 3:
+        original_gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
+        enhanced_gray = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
+    else:
+        original_gray = original_image
+        enhanced_gray = enhanced_image
+
+    hist_original = cv2.calcHist([original_gray], [0], None, [256], [0, 256])
+    hist_enhanced = cv2.calcHist([enhanced_gray], [0], None, [256], [0, 256])
+
+    hist_original = hist_original.flatten() / hist_original.sum()
+    hist_enhanced = hist_enhanced.flatten() / hist_enhanced.sum()
+
+    plt.figure(figsize=(12, 6))
+    
+    plt.subplot(1, 2, 1)
+    plt.plot(hist_original, color='blue')
+    plt.title('Histogram Citra Asli')
+    plt.xlabel('Intensitas Pixel')
+    plt.ylabel('Frekuensi Relatif')
+    plt.grid(True)
+
+    plt.subplot(1, 2, 2)
+    plt.plot(hist_enhanced, color='red')
+    plt.title('Histogram Citra Hasil Peningkatan')
+    plt.xlabel('Intensitas Pixel')
+    plt.ylabel('Frekuensi Relatif')
+    plt.grid(True)
+
+    histogram_path = output_path.rsplit('.', 1)[0] + '_histogram.png'
+    plt.tight_layout()
+    plt.savefig(histogram_path)
+    plt.close()
+
+    return histogram_path
+
 def enhance_image(input_image_path, output_image_path=None, enhancement_params=None):
     current_enhancement_params = {
         'gamma_min': 0.4, 'gamma_max': 1.1,
@@ -206,11 +243,7 @@ def enhance_image(input_image_path, output_image_path=None, enhancement_params=N
     refined_illumination = refine_illumination_map(clipped_illumination, kernel_size=15)
     clipped_refined_illumination = np.clip(refined_illumination, 0, 1)
     
-    corrected_illumination, applied_gamma = adaptive_gamma_correction(
-        clipped_refined_illumination,
-        current_enhancement_params['gamma_min'],
-        current_enhancement_params['gamma_max']
-    )
+    corrected_illumination = adaptive_gamma_correction(clipped_refined_illumination)
 
     fused_luminance = multi_scale_fusion(y_channel_normalized, corrected_illumination)
 
@@ -241,6 +274,9 @@ def enhance_image(input_image_path, output_image_path=None, enhancement_params=N
              os.makedirs(output_directory, exist_ok=True)
         cv2.imwrite(output_image_path, final_enhanced_bgr_image)
         
+        histogram_path = plot_histograms(original_bgr_image, final_enhanced_bgr_image, output_image_path)
+        print(f"Histogram saved to: {histogram_path}")
+        
     return final_enhanced_bgr_image, calculated_metrics, current_enhancement_params
 
 def process_image_in_parallel(image_file_path, batch_main_output_dir, enhancement_parameters):
@@ -248,29 +284,21 @@ def process_image_in_parallel(image_file_path, batch_main_output_dir, enhancemen
     individual_enhanced_image_path = os.path.join(batch_main_output_dir, f"enhanced_{image_stem_name}.jpg")
 
     try:
-        enhanced_image_data, calculated_metrics, applied_parameters = enhance_image(
+        enhanced_image_data = enhance_image(
             image_file_path,
             individual_enhanced_image_path,
             enhancement_parameters
         )
-        return {
-            'name': image_stem_name,
-            'metrics': calculated_metrics,
-            'parameters': applied_parameters,
-            'output_path': individual_enhanced_image_path,
-            'status': 'success'
-        }
+        print(f"Successfully enhanced: {image_stem_name}")
+        return True
     except Exception as e:
-        return {
-            'name': image_stem_name,
-            'error': str(e),
-            'status': 'failed'
-        }
+        print(f"Failed to enhance {image_stem_name}: {str(e)}")
+        return False
 
 def process_directory_batch(input_images_dir, main_batch_output_dir, enhancement_parameters=None):
-    print_section_header("BATCH PROCESSING")
+    print("\n=== BATCH PROCESSING ===")
     print(f"Input Directory: {input_images_dir}")
-    print(f"Output Directory (for enhanced images & summary): {main_batch_output_dir}")
+    print(f"Output Directory: {main_batch_output_dir}")
     os.makedirs(main_batch_output_dir, exist_ok=True)
     
     image_extensions = ('*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tif', '*.tiff')
@@ -280,7 +308,7 @@ def process_directory_batch(input_images_dir, main_batch_output_dir, enhancement
     
     if not image_file_paths:
         print(f"No image files found in {input_images_dir} with extensions {image_extensions}")
-        return {} 
+        return
 
     num_images_found = len(image_file_paths)
     print(f"\nFound {num_images_found} images to process.")
@@ -290,68 +318,25 @@ def process_directory_batch(input_images_dir, main_batch_output_dir, enhancement
     
     print(f"\nProcessing with up to {max_workers} worker(s)...")
     
-    processing_results_ordered = []
-    with tqdm(total=num_images_found, desc="Batch Processing Images") as progress_bar:
+    successful_count = 0
+    with tqdm(total=num_images_found, desc="Processing Images") as progress_bar:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_image_stem = {
-                executor.submit(process_image_in_parallel, img_path, main_batch_output_dir, enhancement_parameters): Path(img_path).stem
+            futures = [
+                executor.submit(process_image_in_parallel, img_path, main_batch_output_dir, enhancement_parameters)
                 for img_path in image_file_paths
-            }
-            for future in future_to_image_stem:
-                try:
-                    result_data = future.result()
-                    processing_results_ordered.append(result_data)
-                except Exception as e:
-                    image_stem_for_error = future_to_image_stem[future]
-                    processing_results_ordered.append({'name': image_stem_for_error, 'error': f"Future execution error: {str(e)}", 'status': 'failed'})
+            ]
+            for future in futures:
+                if future.result():
+                    successful_count += 1
                 progress_bar.update(1)
 
-    batch_results_dictionary = {res['name']: res for res in processing_results_ordered if 'name' in res}
-
-    successful_enhancements = sum(1 for res in processing_results_ordered if res.get('status') == 'success')
-    failed_enhancements = len(processing_results_ordered) - successful_enhancements
-
-    print_section_header("INDIVIDUAL IMAGE PROCESSING RESULTS")
-    if not processing_results_ordered:
-        print("No images were processed or results available.")
-    for res_item in processing_results_ordered:
-        print("\n" + "-"*60)
-        print(f"Image: {res_item.get('name', 'Unknown Image')}")
-        if res_item.get('status') == 'success':
-            print("Status: Successfully Enhanced")
-            if res_item.get('output_path'):
-                print(f"Output: {res_item['output_path']}")
-        else:
-            print(f"Status: Failed")
-            print(f"  Error: {res_item.get('error', 'Unknown error')}")
-    print("-" * 60)
-
-    print_section_header("OVERALL PROCESSING SUMMARY")
-    print(f"Total Images Attempted: {num_images_found}")
-    print(f"Successfully Enhanced: {successful_enhancements}")
-    print(f"Failed: {failed_enhancements}")
-
-    if failed_enhancements > 0:
-        print("\nDetails of Failed Images:")
-        for res_item in processing_results_ordered:
-            if res_item.get('status') == 'failed':
-                print(f"  - Image: {res_item.get('name', 'N/A')}, Error: {res_item.get('error', 'Unknown error')}")
-
-    batch_summary_file_path = os.path.join(main_batch_output_dir, 'processing_summary.json')
-    batch_summary_data = {
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'total_images_found': num_images_found,
-        'successful_processing': successful_enhancements,
-        'failed_processing': failed_enhancements,
-        'results': batch_results_dictionary 
-    }
-    with open(batch_summary_file_path, 'w') as f_json:
-        json.dump(batch_summary_data, f_json, indent=4)
-    print_file_info(batch_summary_file_path, "Batch Summary File")
-    return batch_results_dictionary
+    print("\n=== PROCESSING SUMMARY ===")
+    print(f"Total Images: {num_images_found}")
+    print(f"Successfully Enhanced: {successful_count}")
+    print(f"Failed: {num_images_found - successful_count}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Advanced Image Enhancement for Low Visibility Conditions')
+    parser = argparse.ArgumentParser(description='Image Enhancement')
     parser.add_argument('--input', type=str, required=True, help='Input image path or directory for batch processing.')
     parser.add_argument('--output', type=str, required=True, help='Output image path (for single image) or directory (for batch processing).')
     parser.add_argument('--gamma-min', type=float, default=0.4, help='Minimum gamma value for adaptive gamma correction.')
@@ -361,44 +346,6 @@ def main():
     parser.add_argument('--batch', action='store_true', help='Enable batch processing for a directory of images.')
     
     cli_args = parser.parse_args()
-
-    original_output_arg = cli_args.output
-    
-    path_for_name_check_str = original_output_arg
-    had_trailing_slash = False
-    if original_output_arg.endswith('/') or original_output_arg.endswith('\\\\'):
-        had_trailing_slash = True
-        # rstrip can return empty string if original was just "/" or "\\"
-        temp_stripped = original_output_arg.rstrip('/\\\\')
-        # Ensure path_for_name_check_str is not empty if original was e.g. "/"
-        # If temp_stripped is empty, it means original_output_arg was a root or just slashes
-        path_for_name_check_str = temp_stripped if temp_stripped else original_output_arg
-
-    # p_check needs to be created from a non-empty string for .name to work as expected
-    # If path_for_name_check_str ended up empty (e.g. original was '/'), Path('').name is '', which is fine.
-    p_check = Path(path_for_name_check_str)
-
-    if p_check.name == "result":
-        # Construct new path by replacing 'result' with 'results'
-        new_p = p_check.with_name("results")
-        new_path_str = str(new_p) # Converts to OS-specific path string
-
-        if had_trailing_slash:
-            # If original had a trailing slash, ensure the new path also does for consistency.
-            if not new_path_str.endswith(os.sep):
-                 new_path_str += os.sep
-        
-        print(f"Info: Output path '{original_output_arg}' has been automatically changed to '{new_path_str}'.")
-        cli_args.output = new_path_str
-
-    print_section_header("PROGRAM CONFIGURATION")
-    print("Parameters:")
-    print(f"  Input: {cli_args.input}")
-    print(f"  Output: {cli_args.output}")
-    print(f"  Gamma Range: [{cli_args.gamma_min}, {cli_args.gamma_max}]")
-    print(f"  Detail Strength: {cli_args.detail}")
-    print(f"  Denoise Strength: {cli_args.denoise_strength}")
-    print(f"  Batch Mode: {'Yes' if cli_args.batch else 'No'}")
 
     enhancement_params_from_cli = {
         'gamma_min': cli_args.gamma_min,
@@ -434,29 +381,23 @@ def main():
             if single_output_file_directory and not os.path.exists(single_output_file_directory):
                 os.makedirs(single_output_file_directory, exist_ok=True)
 
-            print_section_header("SINGLE IMAGE ENHANCEMENT")
+            print("\n=== SINGLE IMAGE ENHANCEMENT ===")
             print(f"Processing: {input_file_arg}")
             print(f"Output to: {single_output_file_path}")
 
-            enhanced_image_data, calculated_metrics, applied_parameters = enhance_image(
+            enhanced_image_data = enhance_image(
                 input_file_arg, 
                 single_output_file_path, 
                 enhancement_params_from_cli
             )
-            
-            print_section_header("ENHANCEMENT RESULTS (SINGLE IMAGE)")
-            print_metrics_table(calculated_metrics)
-            print_file_info(single_output_file_path, "Enhanced Image Saved To")
+            print("\nEnhancement completed successfully!")
 
     except Exception as e:
-        print_section_header("CRITICAL ERROR")
-        import traceback
-        print(f"An unexpected error occurred: {str(e)}")
-        print("Traceback:")
-        print(traceback.format_exc())
+        print("\n=== ERROR ===")
+        print(f"An error occurred: {str(e)}")
         return 1
     
-    print_section_header("PROCESSING COMPLETE")
+    print("\n=== PROCESSING COMPLETE ===")
     return 0
 
 if __name__ == "__main__":

@@ -49,19 +49,6 @@ An advanced image enhancement project for improving visibility in images, especi
     ```
 
 3.  **Install dependencies:**
-    Create a `requirements.txt` file with the following content:
-    ```txt
-    opencv-python
-    numpy
-    scipy
-    scikit-image
-    matplotlib
-    tqdm
-    # Add opencv-contrib-python if cv2.ximgproc.guidedFilter is used and not in base opencv-python
-    # Consider opencv-contrib-python if you encounter issues with ximgproc
-    opencv-contrib-python 
-    ```
-    Then run:
     ```bash
     pip install -r requirements.txt
     ```
