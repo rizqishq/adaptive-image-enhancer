@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg') 
 import cv2
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -193,17 +195,21 @@ def plot_histograms(original_image, enhanced_image, output_path):
     hist_original = cv2.calcHist([original_gray], [0], None, [256], [0, 256])
     hist_enhanced = cv2.calcHist([enhanced_gray], [0], None, [256], [0, 256])
 
-    hist_original = hist_original.flatten() / hist_original.sum()
-    hist_enhanced = hist_enhanced.flatten() / hist_enhanced.sum()
+    print(f"[DEBUG] hist_original sum: {hist_original.sum()}")
+    print(f"[DEBUG] hist_enhanced sum: {hist_enhanced.sum()}")
+
+    eps = 1e-7
+    hist_original = hist_original.flatten() / (hist_original.sum() + eps)
+    hist_enhanced = hist_enhanced.flatten() / (hist_enhanced.sum() + eps)
 
     plt.figure(figsize=(12, 6))
-    
     plt.subplot(1, 2, 1)
     plt.plot(hist_original, color='blue')
     plt.title('Histogram Citra Asli')
     plt.xlabel('Intensitas Pixel')
     plt.ylabel('Frekuensi Relatif')
     plt.grid(True)
+    plt.ylim(0, max(hist_original.max(), 0.01))
 
     plt.subplot(1, 2, 2)
     plt.plot(hist_enhanced, color='red')
@@ -211,6 +217,7 @@ def plot_histograms(original_image, enhanced_image, output_path):
     plt.xlabel('Intensitas Pixel')
     plt.ylabel('Frekuensi Relatif')
     plt.grid(True)
+    plt.ylim(0, max(hist_enhanced.max(), 0.01))
 
     histogram_path = output_path.rsplit('.', 1)[0] + '_histogram.png'
     plt.tight_layout()
@@ -273,9 +280,6 @@ def enhance_image(input_image_path, output_image_path=None, enhancement_params=N
         if output_directory and not os.path.exists(output_directory):
              os.makedirs(output_directory, exist_ok=True)
         cv2.imwrite(output_image_path, final_enhanced_bgr_image)
-        
-        histogram_path = plot_histograms(original_bgr_image, final_enhanced_bgr_image, output_image_path)
-        print(f"Histogram saved to: {histogram_path}")
         
     return final_enhanced_bgr_image, calculated_metrics, current_enhancement_params
 
