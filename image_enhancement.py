@@ -60,26 +60,6 @@ def refine_illumination_map(illumination_map, kernel_size=15):
     smoothed_illumination = gaussian_filter(closed_illumination, sigma=3)
     return smoothed_illumination
 
-def apply_advanced_histogram_equalization(bgr_image):
-    lab_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2LAB)
-    l_channel, a_channel, b_channel = cv2.split(lab_image)
-    
-    mean_l_channel_intensity = np.mean(l_channel)
-    clahe_clip_limit = 2.0 if mean_l_channel_intensity < 128 else 1.5
-    clahe = cv2.createCLAHE(clipLimit=clahe_clip_limit, tileGridSize=(8, 8))
-    
-    clahe_l_channel = clahe.apply(l_channel)
-    global_equalized_l_channel = cv2.equalizeHist(l_channel)
-    
-    weights = [0.6, 0.4] if mean_l_channel_intensity < 100 else \
-              [0.4, 0.6] if mean_l_channel_intensity > 150 else \
-              [0.5, 0.5]
-              
-    weighted_l_channel = cv2.addWeighted(clahe_l_channel, weights[0], global_equalized_l_channel, weights[1], 0)
-    enhanced_lab_image = cv2.merge([weighted_l_channel, a_channel, b_channel])
-    enhanced_bgr_image = cv2.cvtColor(enhanced_lab_image, cv2.COLOR_LAB2BGR)
-    return enhanced_bgr_image
-
 def adaptive_gamma_correction(illumination_map_normalized, gamma_min=0.4, gamma_max=1.1):
     mean_illumination = np.mean(illumination_map_normalized)
     std_illumination = np.std(illumination_map_normalized)
@@ -141,90 +121,6 @@ def denoise_image_bgr(image_float_0_1, h_parameter=5):
     image_8bit = (image_float_0_1 * 255).astype(np.uint8)
     denoised_8bit = cv2.bilateralFilter(image_8bit, 9, h_parameter, h_parameter)
     return denoised_8bit.astype(np.float32) / 255.0
-
-def print_section_header(title):
-    print("\n" + "="*80)
-    print(f" {title} ".center(80, "="))
-    print("="*80 + "\n")
-
-def print_metrics_table(image_metrics):
-    print("\n{:<20} {:<15} {:<15}".format("Metric", "Original", "Enhanced"))
-    print("-" * 50)
-    print("{:<20} {:<15} {:<15.2f}".format(
-        "PSNR (dB)",
-        "N/A",
-        image_metrics.get('PSNR', float('nan'))
-    ))
-    print("{:<20} {:<15} {:<15.4f}".format(
-        "SSIM",
-        "N/A",
-        image_metrics.get('SSIM', float('nan'))
-    ))
-    print("{:<20} {:<15.2f} {:<15.2f}".format(
-        "Entropy",
-        image_metrics.get('Entropy_Original', float('nan')),
-        image_metrics.get('Entropy_Enhanced', float('nan'))
-    ))
-    print("{:<20} {:<15.2f} {:<15.2f}".format(
-        "Contrast",
-        image_metrics.get('Contrast_Original', float('nan')),
-        image_metrics.get('Contrast_Enhanced', float('nan'))
-    ))
-    print("-" * 50)
-    print("\nImprovements:")
-    print("{:<20} {:<15.2f}".format("Entropy", image_metrics.get('Entropy_Improvement', float('nan'))))
-    print("{:<20} {:<15.2f}".format("Contrast", image_metrics.get('Contrast_Improvement', float('nan'))))
-
-def print_file_info(file_path_to_check, description_text):
-    print(f"\n{description_text}:")
-    print(f"  Path: {file_path_to_check}")
-    if os.path.exists(file_path_to_check):
-        file_size_kb = os.path.getsize(file_path_to_check) / 1024.0
-        print(f"  Size: {file_size_kb:.1f} KB")
-    else:
-        print("  Status: File not found!")
-
-def plot_histograms(original_image, enhanced_image, output_path):
-    if len(original_image.shape) == 3:
-        original_gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-        enhanced_gray = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
-    else:
-        original_gray = original_image
-        enhanced_gray = enhanced_image
-
-    hist_original = cv2.calcHist([original_gray], [0], None, [256], [0, 256])
-    hist_enhanced = cv2.calcHist([enhanced_gray], [0], None, [256], [0, 256])
-
-    print(f"[DEBUG] hist_original sum: {hist_original.sum()}")
-    print(f"[DEBUG] hist_enhanced sum: {hist_enhanced.sum()}")
-
-    eps = 1e-7
-    hist_original = hist_original.flatten() / (hist_original.sum() + eps)
-    hist_enhanced = hist_enhanced.flatten() / (hist_enhanced.sum() + eps)
-
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.plot(hist_original, color='blue')
-    plt.title('Histogram Citra Asli')
-    plt.xlabel('Intensitas Pixel')
-    plt.ylabel('Frekuensi Relatif')
-    plt.grid(True)
-    plt.ylim(0, max(hist_original.max(), 0.01))
-
-    plt.subplot(1, 2, 2)
-    plt.plot(hist_enhanced, color='red')
-    plt.title('Histogram Citra Hasil Peningkatan')
-    plt.xlabel('Intensitas Pixel')
-    plt.ylabel('Frekuensi Relatif')
-    plt.grid(True)
-    plt.ylim(0, max(hist_enhanced.max(), 0.01))
-
-    histogram_path = output_path.rsplit('.', 1)[0] + '_histogram.png'
-    plt.tight_layout()
-    plt.savefig(histogram_path)
-    plt.close()
-
-    return histogram_path
 
 def enhance_image(input_image_path, output_image_path=None, enhancement_params=None):
     current_enhancement_params = {
