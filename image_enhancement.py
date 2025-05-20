@@ -16,39 +16,6 @@ import warnings
 import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')
 
-def calculate_metrics(original_image, enhanced_image):
-    if len(original_image.shape) == 3:
-        original_gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-        enhanced_gray = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
-    else:
-        original_gray = original_image
-        enhanced_gray = enhanced_image
-
-    mse = np.mean((original_gray.astype(np.float64) - enhanced_gray.astype(np.float64)) ** 2)
-    psnr = float('inf') if mse == 0 else 20 * np.log10(255.0 / np.sqrt(mse))
-    ssim = metrics.structural_similarity(original_gray, enhanced_gray, data_range=original_gray.max() - original_gray.min())
-
-    original_histogram = cv2.calcHist([original_gray], [0], None, [256], [0, 256])
-    enhanced_histogram = cv2.calcHist([enhanced_gray], [0], None, [256], [0, 256])
-    original_histogram /= original_histogram.sum()
-    enhanced_histogram /= enhanced_histogram.sum()
-
-    entropy_original = -np.sum(original_histogram * np.log2(original_histogram + 1e-7))
-    entropy_enhanced = -np.sum(enhanced_histogram * np.log2(enhanced_histogram + 1e-7))
-    contrast_original = np.std(original_gray)
-    contrast_enhanced = np.std(enhanced_gray)
-
-    return {
-        'PSNR': float(psnr),
-        'SSIM': float(ssim),
-        'Entropy_Original': float(entropy_original),
-        'Entropy_Enhanced': float(entropy_enhanced),
-        'Entropy_Improvement': float(entropy_enhanced - entropy_original),
-        'Contrast_Original': float(contrast_original),
-        'Contrast_Enhanced': float(contrast_enhanced),
-        'Contrast_Improvement': float(contrast_enhanced - contrast_original)
-    }
-
 def estimate_illumination(grayscale_image, radius=15, epsilon=1e-3):
     min_intensity_channel = cv2.erode(grayscale_image, np.ones((3, 3), np.uint8))
     guided_filter_output = cv2.ximgproc.guidedFilter(grayscale_image, min_intensity_channel, radius, epsilon)
@@ -169,15 +136,13 @@ def enhance_image(input_image_path, output_image_path=None, enhancement_params=N
     
     final_enhanced_bgr_image = cv2.cvtColor(final_ycrcb_image, cv2.COLOR_YCrCb2BGR)
     
-    calculated_metrics = calculate_metrics(original_bgr_image, final_enhanced_bgr_image)
-
     if output_image_path:
         output_directory = os.path.dirname(output_image_path)
         if output_directory and not os.path.exists(output_directory):
              os.makedirs(output_directory, exist_ok=True)
         cv2.imwrite(output_image_path, final_enhanced_bgr_image)
         
-    return final_enhanced_bgr_image, calculated_metrics, current_enhancement_params
+    return final_enhanced_bgr_image, current_enhancement_params
 
 def process_image_in_parallel(image_file_path, batch_main_output_dir, enhancement_parameters):
     image_stem_name = Path(image_file_path).stem
